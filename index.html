@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Jewelry Infinite Grid - Small</title>
+<style>
+  /* =========================================
+     Base & Reset
+  ========================================= */
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background-color: #ffffff;
+    overflow: hidden; 
+    overscroll-behavior: none;
+  }
+
+  /* =========================================
+     Infinite Viewport & Wrapper
+  ========================================= */
+  #viewport {
+    position: relative; width: 100vw; height: 100vh; cursor: grab;
+  }
+  #viewport:active { cursor: grabbing; }
+
+  /* 9枚のタイルを格納するラッパー（3000px × 3枚 = 9000px） */
+  #canvas-wrapper {
+    display: grid;
+    grid-template-columns: repeat(3, 3000px);
+    grid-template-rows: repeat(3, 3000px);
+    width: 9000px;
+    height: 9000px;
+    will-change: transform;
+  }
+
+  /* 1枚の基準タイル (15列 × 15行 = 225マス) */
+  .grid-tile {
+    display: grid;
+    /* ここの数値を変更すると画像のサイズが変わります */
+    grid-template-columns: repeat(15, 250px);
+    grid-template-rows: repeat(15, 250px);
+    grid-auto-flow: row dense;
+    width: 3000px; 
+    height: 3000px;
+    overflow: hidden;
+  }
+
+  /* =========================================
+     Grid Items (商品枠)
+  ========================================= */
+  .grid-item {
+    background-color: #ffffff;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+    user-select: none; 
+    overflow: hidden;
+    border-right: 1px solid #d0d0d0;
+    border-bottom: 1px solid #d0d0d0;
+  }
+  
+  .grid-item img {
+    width: 100%; height: 100%; object-fit: cover; pointer-events: none; 
+  }
+
+  .span-2 { grid-row: span 2; }
+</style>
+</head>
+<body>
+
+  <div id="viewport">
+    <div id="canvas-wrapper"></div>
+  </div>
+
+  <script>
+    const wrapper = document.getElementById('canvas-wrapper');
+    const imageUrls = [
+      'img/jw-th1.png', 'img/jw-th2.png', 'img/jw-th3.png', 
+      'img/jw-th4.png', 'img/jw-th5.png', 'img/jw-th6.png'
+    ];
+    
+    // マスが15x15=225個に増えたため、敷き詰める要素数も増やします
+    const ITEMS_TO_GENERATE = 260; 
+
+    async function initInfiniteGrid() {
+      const imageData = [];
+      
+      for (let i = 0; i < imageUrls.length; i++) {
+        const isVertical = await new Promise(resolve => {
+          const img = new Image();
+          img.onload = () => resolve(img.naturalHeight > img.naturalWidth);
+          img.onerror = () => resolve(false); 
+          img.src = imageUrls[i];
+        });
+        imageData.push({ src: imageUrls[i], isVertical });
+      }
+
+      const masterTile = document.createElement('div');
+      masterTile.className = 'grid-tile';
+
+      for (let i = 0; i < ITEMS_TO_GENERATE; i++) {
+        const itemData = imageData[i % imageData.length];
+        const item = document.createElement('div');
+        item.className = 'grid-item';
+        if (itemData.isVertical) {
+          item.classList.add('span-2');
+        }
+        
+        const img = document.createElement('img');
+        img.src = itemData.src;
+        item.appendChild(img);
+        masterTile.appendChild(item);
+      }
+
+      // 3x3の9枚のタイルを敷き詰める
+      for (let i = 0; i < 9; i++) {
+        wrapper.appendChild(masterTile.cloneNode(true));
+      }
+
+      setupDrag();
+    }
+
+    // --- ドラッグと無限ループ（ワープ）のロジック ---
+    function setupDrag() {
+      const viewport = document.getElementById('viewport');
+      let isDragging = false;
+      let startX = 0, startY = 0;
+      
+      const TILE_SIZE = 3000;
+      let currentX = -3000; 
+      let currentY = -3000;
+
+      const updateTransform = () => {
+        if (currentX < -4500) { currentX += TILE_SIZE; startX -= TILE_SIZE; }
+        if (currentX > -1500) { currentX -= TILE_SIZE; startX += TILE_SIZE; }
+        if (currentY < -4500) { currentY += TILE_SIZE; startY -= TILE_SIZE; }
+        if (currentY > -1500) { currentY -= TILE_SIZE; startY += TILE_SIZE; }
+
+        wrapper.style.transform = `translate3d(${currentX}px, ${currentY}px, 0)`;
+      };
+
+      updateTransform();
+
+      // PCマウス
+      viewport.addEventListener('mousedown', (e) => {
+        isDragging = true; 
+        startX = e.clientX - currentX; 
+        startY = e.clientY - currentY;
+      });
+      window.addEventListener('mouseup', () => { isDragging = false; });
+      window.addEventListener('mousemove', (e) => {
+        if (!isDragging) return;
+        e.preventDefault();
+        currentX = e.clientX - startX; 
+        currentY = e.clientY - startY;
+        updateTransform();
+      });
+
+      // スマホタッチ
+      viewport.addEventListener('touchstart', (e) => {
+        isDragging = true; 
+        startX = e.touches[0].clientX - currentX; 
+        startY = e.touches[0].clientY - currentY;
+      }, { passive: false });
+      window.addEventListener('touchend', () => { isDragging = false; });
+      window.addEventListener('touchmove', (e) => {
+        if (!isDragging) return;
+        e.preventDefault();
+        currentX = e.touches[0].clientX - startX; 
+        currentY = e.touches[0].clientY - startY;
+        updateTransform();
+      }, { passive: false });
+    }
+
+    initInfiniteGrid();
+  </script>
+</body>
+</html>
